@@ -51,7 +51,8 @@ type RouterSettingsConfig struct {
 
 // LoadConfigFile reads and parses a LiteLLM YAML configuration file.
 // It supports the subset of YAML used by LiteLLM config files:
-// key-value pairs, lists with "- " prefix, and nested maps with indentation.
+// top-level section keys, key-value pairs, lists with "- " prefix,
+// and one level of nested maps (e.g. litellm_params under model_list entries).
 func LoadConfigFile(path string) (*FileConfig, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -82,21 +83,24 @@ func LoadConfigFile(path string) (*FileConfig, error) {
 
 		// Top-level keys (no indentation)
 		if indent == 0 {
-			key := strings.TrimSuffix(trimmed, ":")
-			key = strings.TrimSpace(key)
-			currentSection = key
-			currentModel = nil
-			currentSubSection = ""
+			// Handle section headers (e.g. "model_list:")
+			if strings.HasSuffix(trimmed, ":") {
+				currentSection = strings.TrimSuffix(trimmed, ":")
+				currentModel = nil
+				currentSubSection = ""
+				continue
+			}
 
-			// Handle inline key: value at top level
-			if strings.Contains(trimmed, ":") && !strings.HasSuffix(trimmed, ":") {
-				k, v := splitKeyValue(trimmed)
+			// Handle top-level key: value (only recognized section names)
+			if strings.Contains(trimmed, ":") {
+				k, _ := splitKeyValue(trimmed)
 				switch k {
 				case "model_list", "litellm_settings", "general_settings",
 					"environment_variables", "router_settings":
 					currentSection = k
+					currentModel = nil
+					currentSubSection = ""
 				}
-				_ = v // top-level sections typically don't have inline values
 			}
 			continue
 		}
@@ -205,7 +209,8 @@ func splitKeyValue(s string) (string, string) {
 	return key, val
 }
 
-// parseBool parses a YAML boolean value (True/False/true/false/yes/no).
+// parseBool parses a YAML boolean value.
+// Returns true for "true", "yes", "1" (case-insensitive); false otherwise.
 func parseBool(s string) bool {
 	lower := strings.ToLower(strings.TrimSpace(s))
 	return lower == "true" || lower == "yes" || lower == "1"

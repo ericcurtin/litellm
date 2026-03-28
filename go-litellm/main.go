@@ -54,7 +54,7 @@ func main() {
 
 	// Optionally set up router with load balancing
 	if *enableRouter {
-		deployments := buildDeployments()
+		deployments := buildDefaultDeployments()
 		if len(deployments) > 0 {
 			routerCfg := litellm.DefaultRouterConfig()
 			routerCfg.EnableLogging = true
@@ -218,7 +218,9 @@ func startServer(serverCfg proxy.ServerConfig, port int) {
 	}
 }
 
-func buildDeployments() []litellm.Deployment {
+// buildDefaultDeployments creates default deployments from environment variables
+// when --router is used without --config.
+func buildDefaultDeployments() []litellm.Deployment {
 	var deployments []litellm.Deployment
 
 	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
