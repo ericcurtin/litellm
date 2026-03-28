@@ -196,6 +196,13 @@ func (r *Router) completeWithFallbacks(ctx context.Context, req CompletionReques
 func (r *Router) completeWithRetries(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
 	var lastErr error
 
+	// Apply timeout to the overall retry loop
+	if r.config.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.config.Timeout)
+		defer cancel()
+	}
+
 	for attempt := 0; attempt <= r.config.NumRetries; attempt++ {
 		state, err := r.selectDeployment(req.Model)
 		if err != nil {
@@ -214,13 +221,6 @@ func (r *Router) completeWithRetries(ctx context.Context, req CompletionRequest)
 		}
 		if state.deployment.BaseURL != "" {
 			deployReq.BaseURL = state.deployment.BaseURL
-		}
-
-		// Apply timeout
-		if r.config.Timeout > 0 {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, r.config.Timeout)
-			defer cancel()
 		}
 
 		resp, err := state.deployment.Provider.Complete(ctx, deployReq)
@@ -349,6 +349,9 @@ func (r *Router) selectDeployment(modelGroup string) (*deploymentState, error) {
 }
 
 func (r *Router) selectShuffle(states []*deploymentState) *deploymentState {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	// Weighted random selection
 	totalWeight := 0
 	for _, s := range states {
@@ -359,9 +362,7 @@ func (r *Router) selectShuffle(states []*deploymentState) *deploymentState {
 		totalWeight += w
 	}
 
-	r.mu.Lock()
 	target := r.rng.Intn(totalWeight)
-	r.mu.Unlock()
 
 	cumulative := 0
 	for _, s := range states {

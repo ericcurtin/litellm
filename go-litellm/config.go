@@ -136,8 +136,8 @@ func ParseModelProvider(model string) (provider, modelName string) {
 	lower := strings.ToLower(model)
 	switch {
 	case strings.HasPrefix(lower, "gpt-") ||
-		strings.HasPrefix(lower, "o1") ||
-		strings.HasPrefix(lower, "o3") ||
+		strings.HasPrefix(lower, "o1-") ||
+		strings.HasPrefix(lower, "o3-") ||
 		strings.HasPrefix(lower, "chatgpt") ||
 		strings.HasPrefix(lower, "text-embedding") ||
 		strings.HasPrefix(lower, "text-davinci"):

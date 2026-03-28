@@ -62,8 +62,16 @@ func (s *Stream) Recv() (*StreamChunk, error) {
 // Close closes the stream and releases resources.
 func (s *Stream) Close() {
 	s.cancel()
-	// Drain remaining events
-	for range s.ch {
+	// Drain remaining events with a safety check
+	for {
+		select {
+		case _, ok := <-s.ch:
+			if !ok {
+				return
+			}
+		case <-s.done:
+			return
+		}
 	}
 }
 
@@ -155,10 +163,17 @@ func DoStreamRequest(ctx context.Context, httpClient *http.Client, req *http.Req
 		}
 	}
 
-	_, cancel := context.WithCancel(ctx)
+	streamCtx, cancel := context.WithCancel(ctx)
 	stream := newStream(cancel)
 
-	go ParseSSEStream(resp.Body, stream, model)
+	go func() {
+		// Close body if context is cancelled
+		go func() {
+			<-streamCtx.Done()
+			resp.Body.Close()
+		}()
+		ParseSSEStream(resp.Body, stream, model)
+	}()
 
 	return stream, nil
 }

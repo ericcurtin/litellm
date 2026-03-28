@@ -264,8 +264,14 @@ func (p *AnthropicProvider) parseAnthropicStream(body io.ReadCloser, stream *lit
 			var usage struct {
 				OutputTokens int `json:"output_tokens"`
 			}
-			json.Unmarshal(evt.Delta, &delta)
-			json.Unmarshal(evt.Usage, &usage)
+			if err := json.Unmarshal(evt.Delta, &delta); err != nil {
+				stream.SendEvent(litellm.StreamEvent{Err: fmt.Errorf("failed to parse message_delta: %w", err)})
+				return
+			}
+			if evt.Usage != nil {
+				// Usage is optional on message_delta; ignore unmarshal errors for it
+				json.Unmarshal(evt.Usage, &usage)
+			}
 
 			finishReason := mapAnthropicStopReason(delta.StopReason)
 			chunk := &litellm.StreamChunk{
@@ -358,7 +364,10 @@ func (p *AnthropicProvider) transformRequest(req litellm.CompletionRequest) anth
 			}
 			for _, tc := range msg.ToolCalls {
 				var input interface{}
-				json.Unmarshal([]byte(tc.Function.Arguments), &input)
+				if err := json.Unmarshal([]byte(tc.Function.Arguments), &input); err != nil {
+					// If arguments can't be parsed as JSON, use them as a raw string
+					input = tc.Function.Arguments
+				}
 				blocks = append(blocks, anthropicContentBlock{
 					Type:  "tool_use",
 					ID:    tc.ID,

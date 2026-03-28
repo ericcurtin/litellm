@@ -79,8 +79,12 @@ func (s *Server) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if s.masterKey != "" {
 			auth := r.Header.Get("Authorization")
+			if auth == "" || !strings.HasPrefix(auth, "Bearer ") {
+				writeError(w, http.StatusUnauthorized, "invalid_api_key", "Invalid API key")
+				return
+			}
 			key := strings.TrimPrefix(auth, "Bearer ")
-			if key != s.masterKey {
+			if key == "" || key != s.masterKey {
 				writeError(w, http.StatusUnauthorized, "invalid_api_key", "Invalid API key")
 				return
 			}
