@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	litellm "github.com/ericcurtin/litellm/go-litellm"
+	litellm "github.com/ericcurtin/litellm/go-litellm/internal/litellm"
 )
 
 const anthropicDefaultBase = "https://api.anthropic.com"

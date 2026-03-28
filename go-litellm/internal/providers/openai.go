@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	litellm "github.com/ericcurtin/litellm/go-litellm"
+	litellm "github.com/ericcurtin/litellm/go-litellm/internal/litellm"
 )
 
 const openAIDefaultBase = "https://api.openai.com/v1"

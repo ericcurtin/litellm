@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	litellm "github.com/ericcurtin/litellm/go-litellm"
+	litellm "github.com/ericcurtin/litellm/go-litellm/internal/litellm"
 )
 
 // mockProvider implements litellm.Provider for testing.

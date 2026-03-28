@@ -1,166 +1,64 @@
 # go-litellm
 
-A Go implementation of the core [LiteLLM](https://github.com/BerriAI/litellm) features — a unified interface for multiple LLM providers with consistent OpenAI-format output.
+A Go implementation of the core [LiteLLM](https://github.com/BerriAI/litellm) features — an OpenAI-compatible proxy server that routes requests to multiple LLM providers.
 
 ## Features
 
-- **Unified API** — Single interface for OpenAI, Anthropic, and Azure OpenAI
+- **Unified Proxy** — Single OpenAI-compatible API for OpenAI, Anthropic, and Azure OpenAI
 - **Streaming** — Full SSE streaming support with automatic format translation
 - **Router** — Load balancing across multiple deployments with retry and fallback
-- **Proxy Server** — OpenAI-compatible HTTP proxy with authentication
+- **Authentication** — API key–based proxy authentication
 - **Tool Calling** — Function/tool calling support across providers
-- **Type Safety** — Strongly typed request/response models
 
-## Installation
+## Building
 
 ```bash
-go get github.com/ericcurtin/litellm/go-litellm
+cd go-litellm
+go build -o go-litellm .
 ```
 
-## Quick Start
+## Usage
 
-### Basic Completion
+```bash
+# Set provider API keys
+export OPENAI_API_KEY=sk-...
+export ANTHROPIC_API_KEY=sk-ant-...
 
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "os"
-
-    litellm "github.com/ericcurtin/litellm/go-litellm"
-    "github.com/ericcurtin/litellm/go-litellm/providers"
-)
-
-func main() {
-    client := litellm.NewClient()
-    client.RegisterProvider("openai", providers.NewOpenAIProvider(os.Getenv("OPENAI_API_KEY"), ""))
-
-    resp, err := client.Complete(context.Background(), litellm.CompletionRequest{
-        Model:    "openai/gpt-4",
-        Messages: []litellm.Message{
-            {Role: "user", Content: litellm.StringContent("Hello!")},
-        },
-    })
-    if err != nil {
-        panic(err)
-    }
-    fmt.Println(resp.Choices[0].Message.Content.Text)
-}
+# Run the proxy
+./go-litellm --port 4000 --master-key sk-proxy-key
 ```
 
-### Streaming
+### Flags
 
-```go
-stream, err := client.CompleteStream(ctx, litellm.CompletionRequest{
-    Model:    "openai/gpt-4",
-    Messages: []litellm.Message{
-        {Role: "user", Content: litellm.StringContent("Tell me a story")},
-    },
-})
-if err != nil {
-    panic(err)
-}
-defer stream.Close()
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--port` | `4000` | Port to listen on |
+| `--master-key` | (none) | API key for proxy authentication (also `LITELLM_MASTER_KEY` env) |
+| `--router` | `false` | Enable router mode with load-balanced deployments |
 
-for {
-    chunk, err := stream.Recv()
-    if err == io.EOF {
-        break
-    }
-    if err != nil {
-        panic(err)
-    }
-    fmt.Print(chunk.Choices[0].Delta.Content)
-}
-```
+### Environment Variables
 
-### Multiple Providers
+| Variable | Description |
+|----------|-------------|
+| `OPENAI_API_KEY` | OpenAI API key |
+| `ANTHROPIC_API_KEY` | Anthropic API key |
+| `AZURE_API_KEY` | Azure OpenAI API key |
+| `AZURE_API_BASE` | Azure OpenAI base URL |
+| `AZURE_API_VERSION` | Azure OpenAI API version |
+| `LITELLM_MASTER_KEY` | Proxy master key (alternative to `--master-key`) |
 
-```go
-client := litellm.NewClient()
+## Endpoints
 
-// Register providers
-client.RegisterProvider("openai", providers.NewOpenAIProvider(os.Getenv("OPENAI_API_KEY"), ""))
-client.RegisterProvider("anthropic", providers.NewAnthropicProvider(os.Getenv("ANTHROPIC_API_KEY"), ""))
-client.RegisterProvider("azure", providers.NewAzureProvider(
-    os.Getenv("AZURE_API_KEY"),
-    os.Getenv("AZURE_API_BASE"),
-    "2024-02-15-preview",
-))
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/chat/completions` | POST | Chat completions (streaming supported) |
+| `/v1/embeddings` | POST | Text embeddings |
+| `/v1/models` | GET | List available models |
+| `/health` | GET | Health check |
 
-// Use any provider with the same API
-resp, _ := client.Complete(ctx, litellm.CompletionRequest{
-    Model:    "anthropic/claude-3-5-sonnet-20241022",
-    Messages: []litellm.Message{
-        {Role: "user", Content: litellm.StringContent("Hello!")},
-    },
-})
-```
+## Example Requests
 
-### Router with Load Balancing
-
-```go
-openai := providers.NewOpenAIProvider(os.Getenv("OPENAI_API_KEY"), "")
-
-deployments := []litellm.Deployment{
-    {
-        ModelName:    "gpt",
-        LiteLLMModel: "gpt-4",
-        Provider:     openai,
-        Weight:       2, // Gets 2x traffic
-    },
-    {
-        ModelName:    "gpt",
-        LiteLLMModel: "gpt-3.5-turbo",
-        Provider:     openai,
-        Weight:       1,
-    },
-}
-
-cfg := litellm.DefaultRouterConfig()
-cfg.Strategy = litellm.StrategyShuffle        // or StrategyLeastBusy, StrategyRoundRobin, StrategyLatencyBased
-cfg.NumRetries = 3
-cfg.Fallbacks = map[string][]string{
-    "gpt": {"claude"},                         // Fallback to Claude if all GPT deployments fail
-}
-
-router := litellm.NewRouter(cfg, deployments)
-
-resp, err := router.Complete(ctx, litellm.CompletionRequest{
-    Model:    "gpt",  // Routes to one of the gpt deployments
-    Messages: messages,
-})
-```
-
-### Proxy Server
-
-```go
-package main
-
-import (
-    "log"
-
-    litellm "github.com/ericcurtin/litellm/go-litellm"
-    "github.com/ericcurtin/litellm/go-litellm/providers"
-    "github.com/ericcurtin/litellm/go-litellm/proxy"
-)
-
-func main() {
-    client := litellm.NewClient()
-    client.RegisterProvider("openai", providers.NewOpenAIProvider("sk-...", ""))
-
-    server := proxy.NewServer(proxy.ServerConfig{
-        Client:    client,
-        MasterKey: "sk-proxy-key",  // Optional auth
-    })
-
-    log.Fatal(server.ListenAndServe(":4000"))
-}
-```
-
-Then use it like any OpenAI-compatible API:
+### Chat Completion
 
 ```bash
 curl http://localhost:4000/v1/chat/completions \
@@ -172,53 +70,41 @@ curl http://localhost:4000/v1/chat/completions \
   }'
 ```
 
-Or run the built-in proxy CLI:
+### Streaming
 
 ```bash
-OPENAI_API_KEY=sk-... go run ./cmd/proxy --port 4000 --master-key sk-proxy-key
+curl http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer sk-proxy-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "anthropic/claude-3-5-sonnet-20241022",
+    "messages": [{"role": "user", "content": "Tell me a story"}],
+    "stream": true
+  }'
 ```
 
-### Tool Calling
+### Embeddings
 
-```go
-resp, err := client.Complete(ctx, litellm.CompletionRequest{
-    Model: "openai/gpt-4",
-    Messages: []litellm.Message{
-        {Role: "user", Content: litellm.StringContent("What's the weather in SF?")},
-    },
-    Tools: []litellm.Tool{{
-        Type: "function",
-        Function: litellm.ToolFunction{
-            Name:        "get_weather",
-            Description: "Get current weather",
-            Parameters: map[string]interface{}{
-                "type": "object",
-                "properties": map[string]interface{}{
-                    "location": map[string]interface{}{
-                        "type": "string",
-                    },
-                },
-            },
-        },
-    }},
-})
-
-if len(resp.Choices[0].Message.ToolCalls) > 0 {
-    tc := resp.Choices[0].Message.ToolCalls[0]
-    fmt.Printf("Function: %s, Args: %s\n", tc.Function.Name, tc.Function.Arguments)
-}
+```bash
+curl http://localhost:4000/v1/embeddings \
+  -H "Authorization: Bearer sk-proxy-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/text-embedding-3-small",
+    "input": "Hello world"
+  }'
 ```
 
-## Proxy Server Endpoints
+### List Models
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/v1/chat/completions` | POST | Chat completions (streaming supported) |
-| `/v1/embeddings` | POST | Text embeddings |
-| `/v1/models` | GET | List available models |
-| `/health` | GET | Health check |
+```bash
+curl http://localhost:4000/v1/models \
+  -H "Authorization: Bearer sk-proxy-key"
+```
 
 ## Routing Strategies
+
+When running with `--router`, the proxy load-balances across multiple deployments:
 
 | Strategy | Description |
 |----------|-------------|
@@ -231,22 +117,23 @@ if len(resp.Choices[0].Message.ToolCalls) > 0 {
 
 ```
 go-litellm/
-├── client.go          # Main LiteLLM client
-├── types.go           # OpenAI-compatible types
-├── provider.go        # Provider interface
-├── router.go          # Load balancing router
-├── streaming.go       # SSE streaming support
-├── config.go          # Configuration management
-├── errors.go          # Error types
-├── providers/
-│   ├── openai.go      # OpenAI provider
-│   ├── anthropic.go   # Anthropic (Claude) provider
-│   └── azure.go       # Azure OpenAI provider
-├── proxy/
-│   └── server.go      # HTTP proxy server
-└── cmd/
-    ├── proxy/         # Proxy CLI
-    └── example/       # Usage examples
+├── main.go                        # Binary entry point (proxy server CLI)
+├── internal/
+│   ├── litellm/
+│   │   ├── client.go              # Core LiteLLM client
+│   │   ├── types.go               # OpenAI-compatible types
+│   │   ├── provider.go            # Provider interface
+│   │   ├── router.go              # Load balancing router
+│   │   ├── streaming.go           # SSE streaming support
+│   │   ├── config.go              # Configuration management
+│   │   └── errors.go              # Error types
+│   ├── providers/
+│   │   ├── openai.go              # OpenAI provider
+│   │   ├── anthropic.go           # Anthropic (Claude) provider
+│   │   └── azure.go               # Azure OpenAI provider
+│   └── proxy/
+│       └── server.go              # HTTP proxy server
+└── go.mod
 ```
 
 ## Running Tests
@@ -254,14 +141,4 @@ go-litellm/
 ```bash
 cd go-litellm
 go test ./...
-```
-
-## Building
-
-```bash
-# Build the proxy server
-go build -o litellm-proxy ./cmd/proxy
-
-# Run it
-OPENAI_API_KEY=sk-... ./litellm-proxy --port 4000
 ```

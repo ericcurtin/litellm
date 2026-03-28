@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	litellm "github.com/ericcurtin/litellm/go-litellm"
+	litellm "github.com/ericcurtin/litellm/go-litellm/internal/litellm"
 )
 
 // Server is an OpenAI-compatible proxy server that routes requests through LiteLLM.

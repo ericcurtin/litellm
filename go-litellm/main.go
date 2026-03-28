@@ -1,8 +1,8 @@
-// Command proxy runs an OpenAI-compatible LLM proxy server.
+// Command go-litellm runs an OpenAI-compatible LLM proxy server.
 //
 // Usage:
 //
-//	go run ./cmd/proxy --port 8080 --master-key sk-my-key
+//	go run . --port 8080 --master-key sk-my-key
 //
 // Environment variables:
 //
@@ -19,9 +19,9 @@ import (
 	"log"
 	"os"
 
-	litellm "github.com/ericcurtin/litellm/go-litellm"
-	"github.com/ericcurtin/litellm/go-litellm/providers"
-	"github.com/ericcurtin/litellm/go-litellm/proxy"
+	litellm "github.com/ericcurtin/litellm/go-litellm/internal/litellm"
+	"github.com/ericcurtin/litellm/go-litellm/internal/providers"
+	"github.com/ericcurtin/litellm/go-litellm/internal/proxy"
 )
 
 func main() {

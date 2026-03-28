@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	litellm "github.com/ericcurtin/litellm/go-litellm"
+	litellm "github.com/ericcurtin/litellm/go-litellm/internal/litellm"
 )
 
 // AzureProvider implements the litellm.Provider interface for Azure OpenAI.
