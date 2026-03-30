@@ -60,8 +60,14 @@ pub async fn chat_completion_handler(
                             }
                         }
                         Err(e) => {
-                            let err_msg = format!("data: {{\"error\": \"{}\"}}\n\n", e);
-                            let _ = tx.send(Ok(bytes::Bytes::from(err_msg)));
+                            let error_resp = crate::types::ErrorResponse::new(
+                                e.to_string(),
+                                "server_error",
+                                None,
+                            );
+                            if let Ok(json) = serde_json::to_string(&error_resp) {
+                                let _ = tx.send(Ok(bytes::Bytes::from(format!("data: {}\n\n", json))));
+                            }
                             break;
                         }
                     }

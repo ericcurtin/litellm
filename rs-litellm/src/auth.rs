@@ -1,7 +1,6 @@
 use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::Response;
-use http::StatusCode;
 
 use crate::error::AppError;
 
@@ -44,10 +43,7 @@ pub async fn auth_middleware(
         };
 
         if provided_key != *expected_key {
-            return Err(AppError::ProviderError {
-                status: StatusCode::UNAUTHORIZED,
-                message: "Invalid API key".to_string(),
-            });
+            return Err(AppError::Unauthorized("Invalid API key".to_string()));
         }
     }
 
