@@ -8,11 +8,12 @@
 
 import React, { type ReactNode, useMemo, useState } from "react";
 import type { DailyData } from "@/components/UsagePage/types";
-import { KeyRound } from "lucide-react";
+import { KeyRound, Users } from "lucide-react";
 import { StackedUsageChart, type StackedUsageScale } from "@/components/shared/charts";
 import {
   bucketSeries,
   bucketTotals,
+  labelForDate,
   dailyTotals,
   formatCompact,
   formatLatency,
@@ -32,13 +33,10 @@ interface UsageOverviewProps {
   loading: boolean;
   requestCountsPending: boolean;
   budget: number | null;
-  /** The existing Top Virtual Keys table, rendered as-is so key drill-in keeps working. */
   topKeys: ReactNode;
-  /** The gateway-by-endpoint chart, only present for admins with gateway counts. */
+  topUsers: ReactNode;
   gatewayByEndpoint: ReactNode;
-  /** Top agents read from User-Agent tags; rendered after the models, the next thing people look for. */
   topAgents: ReactNode;
-  /** Spend by provider with its zero/unknown filters. */
   providerBreakdown: ReactNode;
 }
 
@@ -59,6 +57,7 @@ export default function UsageOverview({
   loading,
   requestCountsPending,
   topKeys,
+  topUsers,
   gatewayByEndpoint,
   topAgents,
   providerBreakdown,
@@ -123,8 +122,8 @@ export default function UsageOverview({
       </div>
 
       <Panel
-        title="Top models"
-        subtitle={`${granularity === "day" ? "Daily" : "Weekly"} ${METRIC_NOUN[state.metric]}, top 8 stacked`}
+        title={`${granularity === "day" ? "Daily" : "Weekly"} usage`}
+        subtitle={`${granularity === "day" ? "Daily" : "Weekly"} ${METRIC_NOUN[state.metric]} by model (top 8, rest grouped as Other)`}
         action={
           <>
             <BreakdownControls state={state} onChange={setState} showDimension={false} />
@@ -139,7 +138,6 @@ export default function UsageOverview({
         }
         bodyClassName="px-0 pt-4 pb-0"
       >
-        {/* The chart's axis gutter supplies the rest of the inset, so its plot edge lines up with the title. */}
         <div className="px-2 pb-2">
           {loading ? (
             <ChartSkeleton className="mx-3 h-[380px] w-auto" />
@@ -147,15 +145,18 @@ export default function UsageOverview({
             <StackedUsageChart
               data={series.data}
               series={series.keys}
+              labels={series.labels}
               colors={series.colors}
-              xKey="label"
+              xKey="date"
+              xLabel={(date) => labelForDate(series, date)}
               scale={scale}
               format={format}
-              totalFor={(label) => totalsByBucket.get(label)}
+              totalFor={(date) => totalsByBucket.get(date)}
             />
           )}
         </div>
-        <div className={cn("border-t py-2", PANEL_INSET_X)}>
+        <div className={cn("border-t pt-3 pb-2", PANEL_INSET_X)}>
+          <h4 className="text-sm leading-5 font-medium text-foreground">Top models</h4>
           <Leaderboard
             ranking={ranking}
             series={dailySeries}
@@ -172,6 +173,9 @@ export default function UsageOverview({
 
       <Panel icon={KeyRound} title="Top Virtual Keys">
         {topKeys}
+      </Panel>
+      <Panel icon={Users} title="Top Users by Spend">
+        {topUsers}
       </Panel>
       {gatewayByEndpoint}
     </div>
