@@ -2055,6 +2055,7 @@ if TYPE_CHECKING:
     LiteLLMProxyChatConfig: Type[_LiteLLMProxyChatConfig]
     DeepInfraConfig: Type[_DeepInfraConfig]
     LlamafileChatConfig: Type[_LlamafileChatConfig]
+    LlmmanChatConfig: Type[_LlmmanChatConfig]
     LMStudioChatConfig: Type[_LMStudioChatConfig]
     LmStudioEmbeddingConfig: Type[_LmStudioEmbeddingConfig]
     IBMWatsonXEmbeddingConfig: Type[_IBMWatsonXEmbeddingConfig]
